@@ -3,31 +3,40 @@ package fullObservability;
 import wumpus.Agent;
 import wumpus.World;
 
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.ListIterator;
+import java.util.*;
 
 
 public class SearchAI extends Agent {
-
+    ArrayList<Node> path = new ArrayList<>();
+    LinkedList<Action> plan=new LinkedList<>();
     private class Node{
         State state;
         Node parent;
         int cost;
+        Action a;
         public Node(State s, Node parent, int cost){
             this.state=s;
             this.parent=parent;
             this.cost=cost;
         }
+
+        public State getState(){
+            return this.state;
+        }
+        public int getCost(){
+            return this.cost;
+        }
+
+
     }
 
     private class State{
         int x;
         int y;
         int dir;
+        int cost;
         boolean hasGold;
         boolean hasArrow;
-        int cost;
         boolean hasWumpus;
         boolean goldLooted=false;
         public State(int column, int row, int dir, boolean hasGold, boolean hasArrow){
@@ -37,13 +46,7 @@ public class SearchAI extends Agent {
             this.hasGold=hasGold;
             this.hasArrow=hasArrow;
         }
-        public int getCost(){
-            return this.cost;
-        }
 
-        public void setCost(int cost){
-            this.cost=cost;
-        }
         public int getX(){
             return this.x;
         }
@@ -71,7 +74,12 @@ public class SearchAI extends Agent {
         public boolean getHasArrow(){
             return this.hasArrow;
         }
-
+        public void setCost(int cost){
+            this.cost=cost;
+        }
+        public int getCost(){
+            return this.cost;
+        }
         public void setArrow(boolean hasArrow){
             this.hasArrow=hasArrow;
         }
@@ -89,15 +97,20 @@ public class SearchAI extends Agent {
         public void setGoldLooted(boolean goldLooted){
             this.goldLooted=goldLooted;
         }
+
     }
+
+
 
     private State result(State s, Action a, int column, int row, World.Tile[][] board){
         int agentX=s.getX();
         int agentY= s.getY();
         int dir= s.getDir();
+        System.out.println("x: ");
+        System.out.println("Action: "+a);
+        this.plan.add(a);
         if(a==Action.TURN_LEFT) {
             s.setCost(s.getCost()-1);
-
 
         }
         if(a==Action.TURN_RIGHT) {
@@ -105,6 +118,7 @@ public class SearchAI extends Agent {
 
         }
         if(a==Action.FORWARD) {
+            s.setCost(s.getCost()-1);
             if ( dir == 0 && agentX+1 < column )
                 ++agentX;
             else if (dir == 1 && agentY-1 >= 0 )
@@ -113,6 +127,7 @@ public class SearchAI extends Agent {
                 --agentX;
             else if ( dir == 3 && agentY+1 < row )
                 ++agentY;
+
             return new State(agentX,agentY,dir,s.getHasGold(),s.getHasArrow());
         }
         if(a==Action.SHOOT){
@@ -175,16 +190,46 @@ public class SearchAI extends Agent {
         return new State(agentX,agentY,dir,s.getHasGold(),s.getHasArrow());
     }
 
+    private ArrayList<Node> expand(Node n, int column, int row, World.Tile[][] board){
+        ArrayList<Node> nodes = new ArrayList<>();
+        State s =n.getState();
+        for (Agent.Action a : Agent.Action.values()) {
+            State new_s = result(s,a,column,row,board);
+            Node new_n = new Node(new_s,n,n.getState().getCost());
+            nodes.add(new_n);
+        }
+        return nodes;
+
+    }
+
+    private Optional<Node> best_fist_search(PriorityQueue<Node> f,Node initial_node, HashMap<State, Node> r, int column,int row,World.Tile[][] board){
+        PriorityQueue<Node> frontier = new PriorityQueue<Node>();
+        path.add(initial_node);
+        Node n=null;
+        HashMap<State, Node> reached = new HashMap<>();
+        reached=r;
+        frontier=f;
+        frontier.add(initial_node);
+        while(!frontier.isEmpty()){
+            n=frontier.poll();
+            if(n.getState().getHasGold()){
+                return Optional.ofNullable(n);
+            }
+            for(Node child_n : expand(n,column,row,board)){
+                State s =child_n.getState();
+                if(!reached.containsKey(s) || child_n.getState().getCost()<reached.get(s).getState().getCost()){
+                    reached.put(s,child_n);
+                    frontier.add(child_n);
+                    path.add(child_n);
+                }
+            }
+
+        }
+
+        return Optional.empty();
+    }
 
     private ListIterator<Action> planIterator;
-    private double[][] dangers;
-    private boolean[][] visited;
-    private boolean[][] shoot;
-
-
-
-
-
 
 
     public SearchAI(World.Tile[][] board) {
@@ -196,32 +241,15 @@ public class SearchAI extends Agent {
 
         int r=board.length;
         int c=board[0].length;
-        int shoot_num=1;
-        LinkedList<Action> plan;
-        plan = new LinkedList<Action>();
-
-        // Remove the code below //
-        visited = new boolean[c][r];
-        int x=0;
-        int y=0;
-        visited[x][y] = true;
-
-
-
-         for (int i = 0; i<8; i++)
-             plan.add(Agent.Action.FORWARD);
-        plan.add(Action.TURN_LEFT);
-        plan.add(Action.TURN_LEFT);
-        for (int i = 10; i<18; i++)
-            plan.add(Action.FORWARD);
-        //plan.add(Action.CLIMB);
-
-
-
-
+        State initial_s = new State(c,r,0,true,true);
+        Node initial_n = new Node(initial_s,null,0);
+        PriorityQueue<Node> frontier = new PriorityQueue<Node>();
+        HashMap<State, Node> reached = new HashMap<State, Node>();
+        best_fist_search(frontier,initial_n,reached,c,r,board);
 
         // This must be the last instruction.
         planIterator = plan.listIterator();
+        System.out.println(plan);
     }
 
 
