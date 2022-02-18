@@ -43,6 +43,7 @@ public class MainSearch
 			{
 				long startTime = System.currentTimeMillis();
 				World world = new World( debug, randomAI, manualAI, search );
+				world.printBoardInfo();
 				int score = world.run();
 				long elapsedTime = System.currentTimeMillis()-startTime;
 				System.out.println("Your agent scored: " + score);
